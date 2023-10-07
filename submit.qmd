@@ -1,28 +1,252 @@
 ---
-title: ""
-author: ""
-format:
-  html:
-    embed-resources: true
+title: "Assignment2"
+author: "Derek Walker"
+format: html
+editor: visual
+embed-resources: true
 ---
 
-## Quarto
-
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
-
 ```{r}
-1 + 1
+library(ggplot2)
+library(cowplot)
+library("R.utils")
+library(dtplyr)
+library(dplyr)
+library(data.table)
+library(leaflet)
+library(hrbrthemes)
 ```
 
-You can add options to executable code like this
+## Part 1
 
 ```{r}
-#| echo: false
-2 * 2
+chs_indiv_url <- "https://raw.githubusercontent.com/USCbiostats/data-science-data/master/01_chs/chs_individual.csv"
+tmp1 <- "/Users/gazallab/Desktop/PM566/Git/Assignment_2/chs_indiv.csv"
+if (!file.exists(tmp1)) {
+  download.file(
+    url      = chs_indiv_url,
+    destfile = tmp1,
+    # method   = "libcurl", timeout = 1000 (you may need this option)
+  )
+}
+chs_indiv<- data.table::fread("/Users/gazallab/Desktop/PM566/Git/Assignment_2/chs_indiv.csv")
+
+chs_region_url <- "https://raw.githubusercontent.com/USCbiostats/data-science-data/master/01_chs/chs_regional.csv"
+tmp2 <- "/Users/gazallab/Desktop/PM566/Git/Assignment_2/chs_region.csv"
+if (!file.exists(tmp2)) {
+  download.file(
+    url      = chs_region_url,
+    destfile = tmp2,
+    # method   = "libcurl", timeout = 1000 (you may need this option)
+  )
+}
+chs_reg <- read.csv("/Users/gazallab/Desktop/PM566/Git/Assignment_2/chs_region.csv", header = T)
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+```{r}
+new <- merge(
+  # Data
+  x     = chs_indiv,      
+  y     = chs_reg, 
+  # List of variables to match
+  by.x  = "townname",
+  by.y  = "townname", 
+  # Which obs to keep?
+  all.x = TRUE,      
+  all.y = FALSE
+  )
+
+nrow(new)==nrow(chs_indiv)
+colSums(is.na(new))
+newnum <- select_if(new, is.numeric)
+```
+
+```{r}
+g<-new %>% group_by(male, hispanic) %>%
+  summarise(across(where(is.numeric),~ mean(.x, na.rm = TRUE)))
+
+g$asthma <- round(g$asthma)
+g$active_asthma <- round(g$active_asthma)
+g$father_asthma <- round(g$father_asthma)
+g$mother_asthma <- round(g$mother_asthma)
+g$hayfever <- round(g$hayfever)
+g$allergy <- round(g$allergy)
+g$smoke <- round(g$smoke)
+g$pets <- round(g$pets)
+g$gasstove <- round(g$gasstove)
+
+new2 <- merge(new, g, by.x=c('male','hispanic'), by.y=c('male','hispanic'), all.x=T)
+
+nvec <- gsub("(\\.x|\\.y)","",names(new2))
+nvec <- unique(nvec)
+nvec <- nvec[-c(1,2)]
+
+for(n in nvec){
+  n.y <- paste0(n,'.y')
+  n.x <- paste0(n,'.x')
+  new2[[n.x]][is.na(new2[[n.x]])] <- new2[[n.y]][is.na(new2[[n.x]])]
+}
+
+colSums(is.na(new2)) #Determine the NAs have been adjusted properly
+new2<- new2[,-c(50:94)]
+for ( col in 4:ncol(new2)){
+    colnames(new2)[col] <-  sub("\\.x.*", "", colnames(new2)[col])
+}
+colnames(new2)==colnames(new)#Only returns False in first 5 columns due to reordering
+
+#Let's use a more appropriate identifier for our dataset
+chs <-new2
+```
+
+```{r}
+chs<-chs[!(is.na(bmi))]
+chs$obesity_lvl <- ifelse(chs$bmi<14,"Underweight",
+                  ifelse(chs$bmi>=14 & chs$bmi<22, "Normal",
+                  ifelse(chs$bmi>=22 & chs$bmi<24, "Overweight",
+                  ifelse(chs$bmi>=24, "Obese", NA))))
+
+chs %>% group_by(obesity_lvl) %>% summarise(minbmi= min(bmi), maxbmi=max(bmi),nobs = n()) 
+#table(new$obesity_lvl) - comparison
+chs$smoke_gas_exposure <- ifelse(chs$smoke ==0 & chs$gasstove==0, "Neither",
+                      ifelse(chs$smoke==0 & chs$gasstove==1, "Gas",
+                      ifelse(chs$smoke==1 & chs$gasstove==0, "Smoke",
+                      ifelse(chs$smoke==1 & chs$gasstove==1, "Both",NA))))
+
+#Townname
+chs %>% group_by(townname) %>% 
+  summarise(meanfev = mean(fev, na.rm=T),
+            sdfev = sd(fev, na.rm=T))
+
+#Sex
+chs %>% group_by(male) %>% 
+  summarise(meanfev = mean(fev, na.rm=T),
+            sdfev = sd(fev, na.rm=T))
+
+#Obesity Level
+chs %>% group_by(obesity_lvl) %>% 
+  summarise(meanfev = mean(fev, na.rm=T),
+            sdfev = sd(fev, na.rm=T))
+
+#Smoke_gas_exposure
+chs %>% group_by(smoke_gas_exposure) %>% 
+  summarise(meanfev = mean(fev, na.rm=T),
+            sdfev = sd(fev, na.rm=T))
+```
+
+## Part 2
+
+```{r}
+#BMI vs FEV
+ggplot(data = chs, mapping = aes(x = bmi, y = fev)) +
+  geom_point() + geom_smooth(mapping = aes(x = bmi, y = fev)) +
+  labs(x  = "BMI (kg/m^2)", y = "FEV (ml)") + ggtitle("Association between BMI (kg/m^2) and FEV (ml)")
+
+scatterplot <- ggplot(data = chs) + geom_point(mapping = aes(x = smoke_gas_exposure, y = fev))
+
+
+#Smokegas vs FEV 
+chs %>% ggplot()+
+  geom_boxplot(mapping=aes(x=smoke_gas_exposure, y=fev, fill=smoke_gas_exposure)) +  labs(y = "FEV (ml)")+ ggtitle("Boxplot of FEV (ml) by Smoke_Gas_Exposure Variable")
+
+chs %>% group_by(smoke_gas_exposure) %>%
+  summarise(meanfev = mean(fev, na.rm = T),
+            sdfev = sd(fev, na.rm=T),
+            n =n()
+            )
+        
+
+#PM25 vs FEV  
+test <- chs %>% group_by(pm25_mass) %>%
+  summarise(meanfev = mean(fev, na.rm = T))
+
+meanfev=mean(chs$fev,na.rm=T)
+ggplot(test, aes(x=pm25_mass, y=meanfev)) +geom_point() + stat_smooth(method='loess', col='black', size=0.5, se=F)+ labs(x  = "PM2.5 Mass Concenctration (µg/m³) by Town", y = "Mean FEV (ml) by Town") +ggtitle("Association between Mean PM2.5 Mass Concentration by Town Values (µg/m³) and Mean FEV (ml)")
+```
+
+Evaluation:
+
+BMI vs FEV: In general as the BMI increases the FEV variable increases as well indicating there is a positive association.
+
+Smoke_gas_exp vs FEV: In general there does not appear to be much an association between the smoke_gas_exp at each level and FEV. Though when neither smoke nor gas variables were present in the household the FEV was on average higher than if either or both were present.
+
+PM2.5 vs FEV: There appears to be a negative association between Mean PM2.5 concentration by town and Mean FEV by town. We should expect to see this given certain pollutants are biologically linked with a negative effect on lung function.
+
+## Part 3
+
+```{r warning=F}
+#1 - BMI vs FEV
+ggplot(data=chs, aes(bmi, fev, col=townname)) + 
+  geom_point(mapping = aes(x = bmi, y = fev, color=townname)) + stat_smooth(method='loess', col='black', size=0.5, se=F)+
+  facet_wrap(~ townname, nrow = 3) + ggtitle("Loess Regression of BMI vs FEV (ml) by Town")
+
+#2 - Smoke_gas_exp vs FEV
+chs%>%
+ggplot( aes(x=fev, fill=smoke_gas_exposure)) +
+    geom_histogram( color="white", position = 'identity') +
+    scale_fill_manual(values=c("#FF99FF", "#99ccFF", "#69b3a2", "#FF9933")) +
+    theme_ipsum() +
+    labs(fill="Smoke_Gas_Exposure") + ggtitle("Stacked Histogram of FEV (ml) by Smoke_Gas_Exposure")
+
+chs%>%
+ggplot( aes(x=fev, fill=obesity_lvl)) +
+    geom_histogram( color="white", position = 'identity') +
+    scale_fill_manual(values=c("#FF33FF", "#22ddFF", "#79bc32", "#DDbb11")) +
+    theme_ipsum() +
+    labs(fill="Obesity_lvl") + ggtitle("Stacked Histogram of FEV (ml) by BMI Category")
+
+#3(I believe this is what is being asked for: BMI Cat count by Smoke_gas_exp)
+chs %>%
+  ggplot() + 
+  geom_bar(mapping = aes(x = obesity_lvl, colour = smoke_gas_exposure, fill=smoke_gas_exposure)) + xlab("BMI Category") +ggtitle("BMI Category Count by Smoke_Gas_Exposure")
+
+#4 - Summary Statistics
+bmifev <- chs %>% 
+  group_by(obesity_lvl) %>% 
+  summarize(n = n(),
+            mean = mean(fev),
+            sd = sd(fev),
+            min = min(fev),
+            q1 = quantile(fev, 0.25),
+            median= median(fev),
+            q3 = quantile(fev, 0.75),
+            max = max(fev)
+            )
+bmifev
+
+#5 - Leafletmap
+smkgasfev <- chs %>% 
+  group_by(smoke_gas_exposure) %>% 
+  summarize(n = n(),
+            mean = mean(fev),
+            sd = sd(fev),
+            min = min(fev),
+            q1 = quantile(fev, 0.25),
+            median= median(fev),
+            q3 = quantile(fev, 0.75),
+            max = max(fev)
+            )
+smkgasfev
+
+pm25.pal <- colorNumeric(palette = "viridis", domain=chs$pm25_mass)
+pm25.pal
+
+map <- leaflet(chs) %>% 
+  addProviderTiles('CartoDB.Positron') %>% 
+  addCircles(
+    lat = ~lat, lng=~lon,
+    label = ~paste0(round(pm25_mass,2), ' µg/m³'), color = ~ pm25.pal(pm25_mass),
+    opacity = 1, fillOpacity = 1, radius = chs$pm25_mass*250 #abitrary scalar for differing size emphasis
+    ) %>%
+  addLegend('bottomleft', pal=pm25.pal, values=chs$pm25_mass,
+          title='PM2.5 Concentration (µg/m³)', opacity=1)
+
+map
+
+#6 - PM25 vs FEV
+ggplot(chs,aes(x=pm25_mass, fev)) + 
+  geom_point(position="jitter") + geom_smooth(mapping = aes(x = pm25_mass, y = fev)) +ggtitle("Association between PM2.5 Mass Concentration (µg/m³) and FEV (ml)")
+
+
+```
+
+At the town level, all towns depict a positive association between BMI and FEV. Our histograms give visual representation of the distribution of FEV by bmi and smoke_gas exposure. Most participants were at normal BMI and most of the participants only had a gas stove in the household. The previous interpretation and specifically the relationship between BMI and Smoke_gas_exp can be observed by the bar chart. Based on summary statistics people that were obese had the highest mean FEV. However, this data may be bias given the small sample size of obese participants versus normal bmi participants or another group for example. The chart used in part2 to assess the association between pm2.5 and FEV would be best however, to provide contrast I plotted a simple scatter plot with a loess curve. Though it is slightly hard to tell there is a slight decrease in FEV as pm2.5 concentration increases.
