@@ -21,26 +21,26 @@ library(hrbrthemes)
 
 ```{r}
 chs_indiv_url <- "https://raw.githubusercontent.com/USCbiostats/data-science-data/master/01_chs/chs_individual.csv"
-tmp1 <- "/Users/gazallab/Desktop/PM566/Git/Assignment_2/HW2Git/Assignment2/chs_indiv.csv"
 if (!file.exists(tmp1)) {
   download.file(
     url      = chs_indiv_url,
-    destfile = tmp1,
-    # method   = "libcurl", timeout = 1000 (you may need this option)
+    destfile = file.path("~", "Downloads", "chs_indiv.csv"),
+    method   = "libcurl",
+    timeout = 1000
   )
 }
-chs_indiv<- fread("/Users/gazallab/Desktop/PM566/Git/Assignment_2/HW2Git/Assignment2/chs_indiv.csv")
+chs_indiv<- fread(file.path("/Users/gazallab/Desktop/PM566/Git/Assignment_2/HW2Git/Assignment2/chs_indiv.csv"))
 
 chs_region_url <- "https://raw.githubusercontent.com/USCbiostats/data-science-data/master/01_chs/chs_regional.csv"
-tmp2 <- "/Users/gazallab/Desktop/PM566/Git/Assignment_2/HW2Git/Assignment2/chs_region.csv"
 if (!file.exists(tmp2)) {
   download.file(
     url      = chs_region_url,
-    destfile = tmp2,
-    # method   = "libcurl", timeout = 1000 (you may need this option)
+    destfile = file.path("~", "Downloads", "chs_region.csv"),
+    method   = "libcurl",
+    timeout = 1000
   )
 }
-chs_reg <- fread("/Users/gazallab/Desktop/PM566/Git/Assignment_2/HW2Git/Assignment2/chs_region.csv", header = T)
+chs_reg <- fread(file.path("/Users/gazallab/Desktop/PM566/Git/Assignment_2/HW2Git/Assignment2/chs_region.csv"))
 ```
 
 ```{r}
