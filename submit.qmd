@@ -29,7 +29,7 @@ if (!file.exists(tmp1)) {
     # method   = "libcurl", timeout = 1000 (you may need this option)
   )
 }
-chs_indiv<- data.table::fread("/Users/gazallab/Desktop/PM566/Git/Assignment_2/chs_indiv.csv")
+chs_indiv<- fread("/Users/gazallab/Desktop/PM566/Git/Assignment_2/chs_indiv.csv")
 
 chs_region_url <- "https://raw.githubusercontent.com/USCbiostats/data-science-data/master/01_chs/chs_regional.csv"
 tmp2 <- "/Users/gazallab/Desktop/PM566/Git/Assignment_2/chs_region.csv"
@@ -40,7 +40,7 @@ if (!file.exists(tmp2)) {
     # method   = "libcurl", timeout = 1000 (you may need this option)
   )
 }
-chs_reg <- read.csv("/Users/gazallab/Desktop/PM566/Git/Assignment_2/chs_region.csv", header = T)
+chs_reg <- fread("/Users/gazallab/Desktop/PM566/Git/Assignment_2/chs_region.csv", header = T)
 ```
 
 ```{r}
